@@ -1,0 +1,95 @@
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import static org.junit.jupiter.api.Assertions.*;
+import java.util.*;
+import java.util.Date;
+import java.text.SimpleDateFormat;
+
+public class ChatAppTest {
+
+    private ChatServer server;
+    private User alice;
+    private User bob;
+    private User charlie;
+
+    @BeforeEach
+    public void setUp() {
+        server = new ChatServer();
+        alice = new User("Alice");
+        bob = new User("Bob");
+        charlie = new User("Charlie");
+
+        server.registerUser(alice);
+        server.registerUser(bob);
+        server.registerUser(charlie);
+    }
+
+    @Test
+    public void testSendMessage() {
+        server.sendMessage(alice, Arrays.asList(bob, charlie), "Hello everyone!");
+
+        // Check Bob's chat history
+        List<Message> bobMessages = bob.getHistory().getMessages();
+        assertEquals(1, bobMessages.size());
+        assertEquals("Alice", bobMessages.get(0).getSender().getUsername());
+        assertEquals("Hello everyone!", bobMessages.get(0).getContent());
+
+        // Check Charlie's chat history
+        List<Message> charlieMessages = charlie.getHistory().getMessages();
+        assertEquals(1, charlieMessages.size());
+        assertEquals("Alice", charlieMessages.get(0).getSender().getUsername());
+        assertEquals("Hello everyone!", charlieMessages.get(0).getContent());
+    }
+
+    @Test
+    public void testUndoMessage() {
+        server.sendMessage(alice, Arrays.asList(bob, charlie), "Hello everyone!");
+
+        server.undoMessage(alice, Arrays.asList(bob, charlie));
+
+        // Check Bob's chat history after undo
+        List<Message> bobMessages = bob.getHistory().getMessages();
+        assertEquals(0, bobMessages.size());
+
+        // Check Charlie's chat history after undo
+        List<Message> charlieMessages = charlie.getHistory().getMessages();
+        assertEquals(0, charlieMessages.size());
+    }
+
+    @Test
+    public void testBlockMessages() {
+        server.sendMessage(alice, Arrays.asList(bob, charlie), "Hello everyone!");
+        server.blockMessages(alice, bob);
+
+        server.sendMessage(bob, Arrays.asList(alice, charlie), "How's it going?");
+
+        // Check Alice's chat history should not include Bob's message
+        List<Message> aliceMessages = alice.getHistory().getMessages();
+        assertEquals(1, aliceMessages.size());
+        assertFalse(aliceMessages.get(0).getSender().getUsername().equals("Bob"));
+
+        // Check Charlie's chat history should include Bob's message
+        List<Message> charlieMessages = charlie.getHistory().getMessages();
+        assertEquals(2, charlieMessages.size());
+        assertTrue(charlieMessages.stream().anyMatch(message -> message.getSender().getUsername().equals("Bob")));
+    }
+
+    @Test
+    public void testSearchMessagesByUser() {
+        server.sendMessage(bob, charlie, "Hi Bob!");
+        server.sendMessage(charlie, bob, "Hey Bob!");
+
+        Iterator<Message> charlieMessages = charlie.iterator(bob);
+
+        assertTrue(charlieMessages.hasNext());
+        Message message1 = charlieMessages.next();
+        assertEquals("Bob", message1.getSender().getUsername());
+        assertEquals("Charlie", message1.getRecipients().get(0).getUsername());
+
+        assertTrue(charlieMessages.hasNext());
+        Message message2 = charlieMessages.next();
+        assertEquals("Hey Bob!", message2.getContent());
+
+        assertFalse(charlieMessages.hasNext());
+    }
+}
